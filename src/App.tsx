@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { TutorCommandCenter } from "@/components/tutor-command-center";
 import { StudentPortal } from "@/components/student-portal";
-import { HomeschoolShop } from "@/components/homeschool-shop";
+import { ShopWrapper } from "@/components/shop-wrapper";
 import { LoginPage } from "@/components/login-page";
 import { useTheme } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
@@ -169,9 +169,6 @@ function ProtectedAdminRoute() {
   return <TutorCommandCenter />;
 }
 
-function ShopRoute() {
-  return <HomeschoolShop />;
-}
 
 function MainLayout() {
   const { user } = useAuth();
@@ -211,7 +208,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LoginPage />} />
-          <Route path="/shop" element={<ShopRoute />} />
+          <Route path="/shop" element={<ShopWrapper />} />
           <Route path="/*" element={<MainLayout />} />
         </Routes>
       </Router>
