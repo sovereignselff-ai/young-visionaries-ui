@@ -18,26 +18,35 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : null;
+  });
 
   const login = (email: string) => {
+    let newUser: User | null = null;
     if (email.includes("anna")) {
-      setUser({
+      newUser = {
         id: "anna",
         name: "Anna Pierre",
         role: "admin",
-      });
+      };
     } else if (email.includes("olivier")) {
-      setUser({
+      newUser = {
         id: "olivier",
         name: "Olivier",
         role: "student",
         grade: "8th",
-      });
+      };
+    }
+    if (newUser) {
+      localStorage.setItem("user", JSON.stringify(newUser));
+      setUser(newUser);
     }
   };
 
   const logout = () => {
+    localStorage.removeItem("user");
     setUser(null);
   };
 
