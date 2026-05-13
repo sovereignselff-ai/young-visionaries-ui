@@ -31,6 +31,7 @@ import { ShopWrapper } from "@/components/shop-wrapper";
 import { LoginPage } from "@/components/login-page";
 import { useTheme } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { CurriculumProvider } from "@/contexts/CurriculumContext";
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -190,7 +191,7 @@ function MainLayout() {
         <main className="flex-1 overflow-auto">
           <Routes>
             <Route path="/admin" element={<ProtectedAdminRoute />} />
-            <Route path="/student" element={<StudentPortal student="olivier" />} />
+            <Route path="/student" element={<StudentPortal />} />
             <Route
               path="*"
               element={<Navigate to={user?.role === "admin" ? "/admin" : "/student"} replace />}
@@ -205,13 +206,15 @@ function MainLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/shop" element={<ShopWrapper />} />
-          <Route path="/*" element={<MainLayout />} />
-        </Routes>
-      </Router>
+      <CurriculumProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/shop" element={<ShopWrapper />} />
+            <Route path="/*" element={<MainLayout />} />
+          </Routes>
+        </Router>
+      </CurriculumProvider>
     </AuthProvider>
   );
 }

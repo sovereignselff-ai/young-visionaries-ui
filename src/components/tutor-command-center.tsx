@@ -1,19 +1,8 @@
 import { useState } from "react";
-import {
-  Sparkles,
-  FileText,
-  Gamepad2,
-  BookOpen,
-  Download,
-  Eye,
-  Search,
-  ArrowRight,
-  Mic,
-  UserPlus,
-} from "lucide-react";
+import { Sparkles, Mic, UserPlus, Search, CircleCheck as CheckCircle2, CircleAlert as AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -24,26 +13,91 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { aiArtifacts, students } from "@/data/mockData";
 import { CurriculumIntakeModal } from "@/components/curriculum-intake-modal";
 import { StudentRoster } from "@/components/student-roster";
-
-const artifactIcons: Record<string, React.ElementType> = {
-  FileText,
-  Gamepad2,
-  BookOpen,
-};
-
-const artifactColors: Record<string, string> = {
-  PDF: "bg-primary text-primary-foreground",
-  Game: "bg-xp text-xp-foreground",
-  Outline: "bg-nexus text-nexus-foreground",
-};
+import { useCurriculum, type Assignment } from "@/contexts/CurriculumContext";
 
 export function TutorCommandCenter() {
   const [commandValue, setCommandValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [intakeModalOpen, setIntakeModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [deploymentStatus, setDeploymentStatus] = useState<{
+    status: "idle" | "loading" | "success" | "error";
+    message?: string;
+  }>({ status: "idle" });
+
+  const { deployAssignment } = useCurriculum();
+
+  const handleGenerateGame = async () => {
+    if (!commandValue.trim()) {
+      setDeploymentStatus({
+        status: "error",
+        message: "Please enter a prompt first",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setDeploymentStatus({ status: "loading" });
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const apiUrl = `${supabaseUrl}/functions/v1/generate-game`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({
+          prompt: commandValue,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate game");
+      }
+
+      const gameData = await response.json();
+
+      // Deploy to student (using olivier as default for demo)
+      const studentId = "olivier";
+      const assignmentId = `game_${Date.now()}`;
+
+      const assignment: Assignment = {
+        id: assignmentId,
+        studentId,
+        gameData,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+
+      deployAssignment(assignment);
+
+      setDeploymentStatus({
+        status: "success",
+        message: "Module successfully deployed to Student Portal.",
+      });
+
+      setCommandValue("");
+
+      setTimeout(() => {
+        setDeploymentStatus({ status: "idle" });
+      }, 5000);
+    } catch (error) {
+      console.error("Error generating game:", error);
+      setDeploymentStatus({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to generate module",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <>
@@ -80,8 +134,10 @@ export function TutorCommandCenter() {
                 <Input
                   value={commandValue}
                   onChange={(e) => setCommandValue(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleGenerateGame()}
                   placeholder="e.g., Generate a high school prep guide for a 7th grader..."
                   className="h-12 pl-10 pr-12 text-base bg-white border-primary/20 focus-visible:ring-primary/40"
+                  disabled={isGenerating}
                 />
                 <button
                   onClick={() => setIsListening(!isListening)}
@@ -91,59 +147,65 @@ export function TutorCommandCenter() {
                       : "text-muted-foreground hover:text-primary"
                   }`}
                   title="Voice input"
+                  disabled={isGenerating}
                 >
                   <Mic className="size-5" />
                 </button>
               </div>
-              <Button size="lg" className="h-12 px-6 gap-2 bg-primary hover:bg-primary/90">
-                <Sparkles className="size-4" />
-                Generate
+              <Button
+                onClick={handleGenerateGame}
+                size="lg"
+                className="h-12 px-6 gap-2 bg-primary hover:bg-primary/90"
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <>
+                    <div className="size-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-4" />
+                    Generate
+                  </>
+                )}
               </Button>
             </div>
+
+            {/* Loading State */}
+            {isGenerating && (
+              <div className="mt-4 p-4 bg-white rounded-lg border border-primary/20">
+                <div className="flex items-center gap-2 text-primary">
+                  <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-medium">AI crafting and deploying module...</span>
+                </div>
+              </div>
+            )}
+
+            {/* Status Messages */}
+            {deploymentStatus.status === "success" && (
+              <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200 flex items-start gap-3">
+                <CheckCircle2 className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-green-900">{deploymentStatus.message}</p>
+                  <p className="text-sm text-green-700 mt-1">
+                    The module is now available in the Student Portal.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {deploymentStatus.status === "error" && (
+              <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200 flex items-start gap-3">
+                <AlertCircle className="size-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-red-900">Generation Failed</p>
+                  <p className="text-sm text-red-700 mt-1">{deploymentStatus.message}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Recent AI Artifacts */}
-        <div>
-          <h2 className="scroll-m-20 text-xl font-semibold tracking-tight mb-4">
-            Recent AI Artifacts
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {aiArtifacts.map((artifact) => {
-              const IconComp = artifactIcons[artifact.icon];
-              const colorClass = artifactColors[artifact.type];
-              return (
-                <Card key={artifact.id} className="group hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className={`flex size-10 items-center justify-center rounded-lg ${colorClass}`}>
-                        <IconComp className="size-5" />
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {artifact.type}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-base mt-2">{artifact.title}</CardTitle>
-                    <CardDescription>{artifact.subject}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{artifact.createdAt}</span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="size-8">
-                          <Eye className="size-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="size-8">
-                          <Download className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Student Roster & Analytics */}
         <StudentRoster />
@@ -160,49 +222,45 @@ export function TutorCommandCenter() {
                   <TableRow className="bg-muted/50">
                     <TableHead className="pl-4">Student Name</TableHead>
                     <TableHead>Current Level / XP</TableHead>
-                    <TableHead>Last Concept Struggled With</TableHead>
-                    <TableHead className="pr-4">AI Recommended Action</TableHead>
+                    <TableHead>Pending Modules</TableHead>
+                    <TableHead className="pr-4">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell className="pl-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar size="default">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                              {student.avatarFallback}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{student.name}</div>
-                            <div className="text-xs text-muted-foreground">{student.grade} Grade</div>
-                          </div>
+                  <TableRow>
+                    <TableCell className="pl-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar size="default">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                            OL
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">Olivier</div>
+                          <div className="text-xs text-muted-foreground">8th Grade</div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="secondary" className="w-fit">
-                            Level {student.level}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {student.xp} / {student.xpToNext} XP
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium text-destructive">
-                          {student.lastStruggledWith}
-                        </span>
-                      </TableCell>
-                      <TableCell className="pr-4">
-                        <div className="flex items-start gap-2">
-                          <ArrowRight className="size-4 mt-0.5 text-primary shrink-0" />
-                          <span className="text-sm">{student.aiRecommendedAction}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="secondary" className="w-fit">
+                          Level 5
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">1200 / 1500 XP</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-900 border-yellow-200">
+                        1 Pending
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2 bg-blue-500 rounded-full" />
+                        <span className="text-sm">Active</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
